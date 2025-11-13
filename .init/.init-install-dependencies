@@ -1,0 +1,4 @@
+{
+    "command": "npm install",
+    "working_directory": "/home/kavia/workspace/code-generation/conversational-ai-interface-224112/frontend_web_ui"
+}
