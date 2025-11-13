@@ -10,7 +10,7 @@ import axios from "axios";
 const baseURL =
   (process.env.REACT_APP_API_BASE as string) ||
   (process.env.REACT_APP_BACKEND_URL as string) ||
-  "";
+  "http://localhost:3001";
 
 const api = axios.create({
   baseURL,
@@ -44,7 +44,7 @@ export async function* streamMessage(message: string): AsyncGenerator<string, vo
   const base =
     (process.env.REACT_APP_API_BASE as string) ||
     (process.env.REACT_APP_BACKEND_URL as string) ||
-    "";
+    "http://localhost:3001";
   const urlBase = base ? base.replace(/\/$/, "") : "";
   const streamUrl = `${urlBase}/api/chat/stream`;
 
