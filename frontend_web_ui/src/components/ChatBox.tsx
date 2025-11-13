@@ -1,7 +1,7 @@
 import React, { useMemo, useRef, useState, useEffect } from "react";
-import { sendMessage } from "../api/chatClient";
+import axios from "axios";
 import { motion, AnimatePresence } from "framer-motion";
-import Typed from "react-typed";
+import { ReactTyped } from "react-typed";
 
 /**
  * PUBLIC_INTERFACE
@@ -11,9 +11,19 @@ import Typed from "react-typed";
  * - Uses react-typed to simulate assistant typing indicator.
  */
 export default function ChatBox() {
-  const [input, setInput] = useState("");
-  const [messages, setMessages] = useState<{ role: "user" | "assistant"; content: string }[]>([]);
-  const [loading, setLoading] = useState(false);
+  // TypeScript message type for chat items
+  type Msg = { from: "ai" | "user"; text: string };
+
+  // Resolve API base via environment variables; fallback to same-origin
+  const API_BASE =
+    (process.env.REACT_APP_API_BASE as string) ||
+    (process.env.REACT_APP_BACKEND_URL as string) ||
+    "";
+  const chatEndpoint = API_BASE ? `${API_BASE.replace(/\/$/, "")}/api/chat` : "/api/chat";
+
+  const [input, setInput] = useState<string>("");
+  const [messages, setMessages] = useState<Msg[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement | null>(null);
 
@@ -28,14 +38,17 @@ export default function ChatBox() {
     const text = input.trim();
     if (!text) return;
     setLoading(true);
-    setMessages((m) => [...m, { role: "user", content: text }]);
+    setMessages((m) => [...m, { from: "user", text }]);
     setInput("");
 
     try {
-      const reply = await sendMessage(text);
-      setMessages((m) => [...m, { role: "assistant", content: reply }]);
+      const resp = await axios.post(chatEndpoint, { message: text });
+      const reply: string = resp?.data?.reply ?? "";
+      setMessages((m) => [...m, { from: "ai", text: reply }]);
     } catch (e: any) {
-      setError(e?.message || "Failed to get reply");
+      const detail =
+        e?.response?.data?.detail || e?.message || "Failed to get reply";
+      setError(detail);
     } finally {
       setLoading(false);
     }
@@ -55,9 +68,7 @@ export default function ChatBox() {
             <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-blue-500 to-blue-700 shadow-glow" />
             <span className="font-semibold text-slate-800 tracking-tight">Talk 2 AI</span>
           </div>
-          <div className="text-xs text-slate-500">
-            Ocean Professional
-          </div>
+          <div className="text-xs text-slate-500">Ocean Professional</div>
         </div>
       </nav>
 
@@ -83,7 +94,7 @@ export default function ChatBox() {
               <div className="relative">
                 <h1 className="text-2xl font-semibold text-slate-800">Hello, how can I help?</h1>
                 <p className="text-sm text-slate-500 mt-1">
-                  <Typed
+                  <ReactTyped
                     strings={headerSubtitle}
                     typeSpeed={40}
                     backSpeed={20}
@@ -100,21 +111,21 @@ export default function ChatBox() {
                 <AnimatePresence initial={false}>
                   {messages.map((m, i) => (
                     <motion.div
-                      key={`${m.role}-${i}`}
+                      key={`${m.from}-${i}`}
                       initial={{ opacity: 0, y: 8 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -8 }}
                       transition={{ duration: 0.2 }}
-                      className={`my-2 flex ${m.role === "user" ? "justify-end" : "justify-start"}`}
+                      className={`my-2 flex ${m.from === "user" ? "justify-end" : "justify-start"}`}
                     >
                       <div
                         className={`max-w-[85%] md:max-w-[70%] rounded-2xl px-4 py-2 text-sm shadow ${
-                          m.role === "user"
+                          m.from === "user"
                             ? "bg-gradient-to-br from-blue-600 to-blue-700 text-white shadow-glow"
                             : "bg-white border border-slate-200/60 text-slate-800"
                         }`}
                       >
-                        {m.content}
+                        {m.text}
                       </div>
                     </motion.div>
                   ))}
@@ -123,7 +134,7 @@ export default function ChatBox() {
                   <div className="my-2 flex justify-start">
                     <div className="max-w-[85%] md:max-w-[70%] rounded-2xl px-4 py-2 text-sm bg-white border border-slate-200/60 text-slate-800">
                       <span className="text-slate-500">
-                        <Typed
+                        <ReactTyped
                           strings={["Thinking...", "Formulating a response..."]}
                           typeSpeed={35}
                           backSpeed={0}
@@ -134,11 +145,7 @@ export default function ChatBox() {
                     </div>
                   </div>
                 )}
-                {error && (
-                  <div className="my-2 text-xs text-ocean-error">
-                    {error}
-                  </div>
-                )}
+                {error && <div className="my-2 text-xs text-ocean-error">{error}</div>}
                 <div ref={endRef} />
               </div>
 
@@ -169,9 +176,7 @@ export default function ChatBox() {
                 </div>
                 <div className="flex items-center justify-between mt-2">
                   <span className="text-[11px] text-slate-400">Powered by your backend</span>
-                  <span className="text-[11px] text-slate-400">
-                    Tip: Press Enter to send
-                  </span>
+                  <span className="text-[11px] text-slate-400">Tip: Press Enter to send</span>
                 </div>
               </div>
             </div>
