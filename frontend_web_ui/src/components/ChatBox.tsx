@@ -1,7 +1,7 @@
 import React, { useMemo, useRef, useState, useEffect } from "react";
-import { sendMessage } from "../api/chatClient.ts";
+import { sendMessage } from "../api/chatClient";
 import { motion, AnimatePresence } from "framer-motion";
-import { Typed } from "react-typed";
+import Typed from "react-typed";
 
 /**
  * PUBLIC_INTERFACE
