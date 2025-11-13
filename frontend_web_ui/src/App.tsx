@@ -1,10 +1,14 @@
 import React from "react";
-import ChatBox from "./components/ChatBox";
+import ChatBox from "./components/ChatBox.tsx";
 
 /**
  * PUBLIC_INTERFACE
- * App root rendering ChatBox.
+ * App: Root rendering the Blue Glow Chat UI.
  */
 export default function App() {
-  return <ChatBox />;
+  return (
+    <div className="min-h-screen">
+      <ChatBox />
+    </div>
+  );
 }
