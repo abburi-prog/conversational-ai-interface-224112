@@ -1,7 +1,7 @@
 import React, { useMemo, useRef, useState, useEffect } from "react";
-import axios from "axios";
 import { motion, AnimatePresence } from "framer-motion";
 import { ReactTyped } from "react-typed";
+import { sendMessage, streamMessage } from "../api/chatClient.ts";
 
 /**
  * PUBLIC_INTERFACE
@@ -13,13 +13,6 @@ import { ReactTyped } from "react-typed";
 export default function ChatBox() {
   // TypeScript message type for chat items
   type Msg = { from: "ai" | "user"; text: string };
-
-  // Resolve API base via environment variables; fallback to same-origin
-  const API_BASE =
-    (process.env.REACT_APP_API_BASE as string) ||
-    (process.env.REACT_APP_BACKEND_URL as string) ||
-    "";
-  const chatEndpoint = API_BASE ? `${API_BASE.replace(/\/$/, "")}/api/chat` : "/api/chat";
 
   const [input, setInput] = useState<string>("");
   const [messages, setMessages] = useState<Msg[]>([]);
@@ -37,17 +30,52 @@ export default function ChatBox() {
     setError(null);
     const text = input.trim();
     if (!text) return;
-    setLoading(true);
+
+    // Append user message
     setMessages((m) => [...m, { from: "user", text }]);
     setInput("");
+    setLoading(true);
 
     try {
-      const resp = await axios.post(chatEndpoint, { message: text });
-      const reply: string = resp?.data?.reply ?? "";
-      setMessages((m) => [...m, { from: "ai", text: reply }]);
+      // Prepare an empty assistant message to progressively fill
+      const aiIndex = messages.length + 1; // after appending user above
+      setMessages((m) => [...m, { from: "ai", text: "" }]);
+
+      let anyStreamed = false;
+      try {
+        for await (const chunk of streamMessage(text)) {
+          anyStreamed = true;
+          // Append chunk to the last AI message
+          setMessages((m) => {
+            const updated = [...m];
+            const lastIdx = updated.length - 1;
+            if (lastIdx >= 0 && updated[lastIdx].from === "ai") {
+              updated[lastIdx] = { ...updated[lastIdx], text: updated[lastIdx].text + chunk };
+            }
+            return updated;
+          });
+        }
+      } catch {
+        // swallow and fall back below
+      }
+
+      if (!anyStreamed) {
+        // Fallback to non-streaming API for reliability
+        const full = await sendMessage(text);
+        setMessages((m) => {
+          const updated = [...m];
+          // Replace the last AI message (empty placeholder) with full text
+          const lastIdx = updated.length - 1;
+          if (lastIdx >= 0 && updated[lastIdx].from === "ai") {
+            updated[lastIdx] = { ...updated[lastIdx], text: full };
+          } else {
+            updated.push({ from: "ai", text: full });
+          }
+          return updated;
+        });
+      }
     } catch (e: any) {
-      const detail =
-        e?.response?.data?.detail || e?.message || "Failed to get reply";
+      const detail = e?.message || "Failed to get reply";
       setError(detail);
     } finally {
       setLoading(false);
@@ -126,11 +154,17 @@ export default function ChatBox() {
                         }`}
                       >
                         {m.text}
+                        {/* Typing pulse while loading on the latest assistant message */}
+                        {i === messages.length - 1 && m.from === "ai" && loading && (
+                          <span className="ml-2 inline-flex items-center">
+                            <span className="inline-block h-2 w-2 rounded-full bg-blue-500 animate-pulse"></span>
+                          </span>
+                        )}
                       </div>
                     </motion.div>
                   ))}
                 </AnimatePresence>
-                {loading && (
+                {loading && messages.length === 0 && (
                   <div className="my-2 flex justify-start">
                     <div className="max-w-[85%] md:max-w-[70%] rounded-2xl px-4 py-2 text-sm bg-white border border-slate-200/60 text-slate-800">
                       <span className="text-slate-500">
